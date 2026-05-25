@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Dashboard | Student Table</title>
+
+     
+</head>
+<link rel="stylesheet" href="./style.css">
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo-area">
+                <h2>📊 SimpleDash</h2>
+            </div>
+            <div class="nav-menu">
+                <button class="nav-btn" id="homeNavBtn">🏠 Home</button>
+                <button class="nav-btn" id="loginNavBtn">🔐 Login</button>
+                <button class="nav-btn" id="registerNavBtn">📝 Register</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="top-bar">
+                <span class="page-title" id="mainPageTitle">Dashboard</span>
+                <div class="user-greeting" id="sessionStatus">👤 Guest</div>
+            </div>
+
+            <div id="dynamicPanel">
+                <!-- Content loads here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple state
+        let activeTab = "home";
+        let loggedInUser = null;
+
+        // Student data array (empty initially)
+        let students = [];
+
+        // Load session
+        function loadSession() {
+            const stored = localStorage.getItem("loggedUser");
+            if (stored) {
+                loggedInUser = stored;
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            const sessionSpan = document.getElementById("sessionStatus");
+            if (loggedInUser) {
+                sessionSpan.innerHTML = `👋 ${loggedInUser} | <span style="cursor:pointer;text-decoration:underline;" id="logoutBtn">Logout</span>`;
+                const logoutBtn = document.getElementById("logoutBtn");
+                if (logoutBtn) logoutBtn.onclick = () => { localStorage.removeItem("loggedUser"); loggedInUser = null; updateUI(); if(activeTab === "home") renderHome(); else if(activeTab === "login") renderLogin(); else renderRegister(); };
+            } else {
+                sessionSpan.innerHTML = `👤 Guest`;
+            }
+        }
+
+        // User functions
+        function getUsers() {
+            const users = localStorage.getItem("users");
+            return users ? JSON.parse(users) : [{ username: "demo", password: "123" }];
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem("users", JSON.stringify(users));
+        }
+
+        function registerUser(username, password, confirm) {
+            if (!username) return "Username required";
+            if (password.length < 3) return "Password too short";
+            if (password !== confirm) return "Passwords don't match";
+            let users = getUsers();
+            if (users.find(u => u.username === username)) return "Username exists";
+            users.push({ username, password });
+            saveUsers(users);
+            return "success";
+        }
+
+        function loginUser(username, password) {
+            let users = getUsers();
+            let user = users.find(u => u.username === username && u.password === password);
+            if (user) {
+                loggedInUser = username;
+                localStorage.setItem("loggedUser", username);
+                updateUI();
+                return "success";
+            }
+            return "Invalid credentials";
+        }
+
+        // Render Home with Table
+        function renderHome() {
+            const panel = document.getElementById("dynamicPanel");
+            document.getElementById("mainPageTitle").innerHTML = "🏠 Student Records";
+
+            // Build table rows from students array
+            let tableRows = "";
+            if (students.length === 0) {
+                tableRows = `<tr class="empty-row"><td colspan="6">📋 No records yet. Add a student above.</td></tr>`;
+            } else {
+                students.forEach((s, index) => {
+                    tableRows += `
+                        <tr> 
+                            <td>${escapeHtml(s.name)}</td>
+                            <td>${escapeHtml(s.phone)}</td>
+                            <td>${s.age}</td>
+                            <td>${escapeHtml(s.matNo)}</td>
+                            <td>${escapeHtml(s.department)}</td>
+                            <td><button class="delete-btn" data-index="${index}" style="background:#ef4444;color:white;border:none;padding:4px 12px;border-radius:6px;cursor:pointer;">Delete</button></td>
+                        </tr>
+                    `;
+                });
+            }
+
+            const html = `
+                <div class="card">
+                    <h3 style="margin-bottom: 1rem;">📋 Student Information Table</h3>
+                    
+                    <!-- Add Student Form -->
+                    <div style="background:#f8fafc; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                        <h4 style="margin-bottom: 0.75rem;">➕ Add New Student</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                            <input type="text" id="inputName" placeholder="Full Name">
+                            <input type="text" id="inputPhone" placeholder="Phone Number">
+                            <input type="number" id="inputAge" placeholder="Age">
+                            <input type="text" id="inputMatNo" placeholder="Matric No.">
+                            <input type="text" id="inputDept" placeholder="Department">
+                            <button id="addBtn" style="background:#22c55e; color:white; border:none; border-radius:8px; cursor:pointer;">+ Add</button>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr><th>Name</th><th>Phone Number</th><th>Age</th><th>Matric No.</th><th>Department</th><th>Action</th></tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p style="font-size: 0.75rem; color: #64748b; margin-top: 1rem;">✅ Data saved automatically in your browser</p>
+                </div>
+            `;
+            panel.innerHTML = html;
+            setActiveNav("home");
+
+            // Add button event
+            document.getElementById("addBtn")?.addEventListener("click", () => {
+                const name = document.getElementById("inputName").value.trim();
+                const phone = document.getElementById("inputPhone").value.trim();
+                const age = document.getElementById("inputAge").value;
+                const matNo = document.getElementById("inputMatNo").value.trim();
+                const dept = document.getElementById("inputDept").value.trim();
+
+                if (!name || !phone || !age || !matNo || !dept) {
+                    showMessage("Please fill all fields", "error");
+                    return;
+                }
+                if (isNaN(age) || age < 1 || age > 120) {
+                    showMessage("Enter valid age", "error");
+                    return;
+                }
+
+                students.push({
+                    name: name,
+                    phone: phone,
+                    age: parseInt(age),
+                    matNo: matNo,
+                    department: dept
+                });
+                saveStudents();
+                renderHome(); // refresh table
+                showMessage("Student added!", "success");
+            });
+
+            // Delete buttons event delegation
+            document.querySelectorAll(".delete-btn").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    const idx = btn.getAttribute("data-index");
+                    if (idx !== null && confirm("Delete this record?")) {
+                        students.splice(parseInt(idx), 1);
+                        saveStudents();
+                        renderHome();
+                        showMessage("Record deleted", "success");
+                    }
+                });
+            });
+        }
+
+        function saveStudents() {
+            localStorage.setItem("students", JSON.stringify(students));
+        }
+
+        function loadStudents() {
+            const stored = localStorage.getItem("students");
+            if (stored) {
+                students = JSON.parse(stored);
+            } else {
+                students = []; // empty table initially, no demo data
+            }
+        }
+
+        function showMessage(msg, type) {
+            const panel = document.getElementById("dynamicPanel");
+            let oldMsg = panel.querySelector(".temp-msg");
+            if (oldMsg) oldMsg.remove();
+            let div = document.createElement("div");
+            div.className = `message ${type} temp-msg`;
+            div.innerText = msg;
+            panel.appendChild(div);
+            setTimeout(() => div.remove(), 2500);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // Render Login
+        function renderLogin() {
+            const panel = document.getElementById("dynamicPanel");
+            document.getElementById("mainPageTitle").innerHTML = "🔐 Login";
+            panel.innerHTML = `
+                <div class="card form-container">
+                    <h3>Login to Dashboard</h3>
+                    <form id="loginForm">
+                        <label>Username</label>
+                        <input type="text" id="loginUser" placeholder="demo">
+                        <label>Password</label>
+                        <input type="password" id="loginPass" placeholder="123">
+                        <button type="submit" class="btn-primary">Sign In</button>
+                    </form>
+                    <p style="margin-top:1rem; font-size:0.8rem;">Demo: demo / 123</p>
+                </div>
+            `;
+            setActiveNav("login");
+            document.getElementById("loginForm").addEventListener("submit", (e) => {
+                e.preventDefault();
+                const user = document.getElementById("loginUser").value.trim();
+                const pass = document.getElementById("loginPass").value;
+                const result = loginUser(user, pass);
+                if (result === "success") {
+                    showMessage("Login successful!", "success");
+                    renderHome();
+                } else {
+                    showMessage(result, "error");
+                }
+            });
+        }
+
+        // Render Register
+        function renderRegister() {
+            const panel = document.getElementById("dynamicPanel");
+            document.getElementById("mainPageTitle").innerHTML = "📝 Register";
+            panel.innerHTML = `
+                <div class="card form-container">
+                    <h3>Create Account</h3>
+                    <form id="regForm">
+                        <label>Username</label>
+                        <input type="text" id="regUser">
+                        <label>Password (min 3 chars)</label>
+                        <input type="password" id="regPass">
+                        <label>Confirm Password</label>
+                        <input type="password" id="regConfirm">
+                        <button type="submit" class="btn-primary">Register</button>
+                    </form>
+                </div>
+            `;
+            setActiveNav("register");
+            document.getElementById("regForm").addEventListener("submit", (e) => {
+                e.preventDefault();
+                const user = document.getElementById("regUser").value.trim();
+                const pass = document.getElementById("regPass").value;
+                const confirm = document.getElementById("regConfirm").value;
+                const result = registerUser(user, pass, confirm);
+                if (result === "success") {
+                    showMessage("Registered! Please login", "success");
+                    setTimeout(() => renderLogin(), 1200);
+                } else {
+                    showMessage(result, "error");
+                }
+            });
+        }
+
+        function setActiveNav(active) {
+            const home = document.getElementById("homeNavBtn");
+            const login = document.getElementById("loginNavBtn");
+            const reg = document.getElementById("registerNavBtn");
+            [home, login, reg].forEach(btn => btn?.classList.remove("active"));
+            if (active === "home") home?.classList.add("active");
+            if (active === "login") login?.classList.add("active");
+            if (active === "register") reg?.classList.add("active");
+        }
+
+        function bindNav() {
+            document.getElementById("homeNavBtn").onclick = () => { activeTab = "home"; renderHome(); };
+            document.getElementById("loginNavBtn").onclick = () => { activeTab = "login"; renderLogin(); };
+            document.getElementById("registerNavBtn").onclick = () => { activeTab = "register"; renderRegister(); };
+        }
+
+        // Init
+        function init() {
+            loadStudents();
+            loadSession();
+            bindNav();
+            activeTab = "home";
+            renderHome();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
